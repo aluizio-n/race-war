@@ -4,15 +4,17 @@ services:
     container_name: racewar-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: racewar
-      POSTGRES_PASSWORD: racewar123
-      POSTGRES_DB: racewar
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - racewar-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U racewar -d racewar"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,14 +29,25 @@ services:
       - "3333:3333"
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://racewar:racewar123@postgres:5432/racewar?schema=public
-      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
-      JWT_EXPIRES_IN: 7d
-      BCRYPT_ROUNDS: 12
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && node dist/server.js"
+    networks:
+      - racewar-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3333/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  racewar-net:
+    driver: bridge
 
 volumes:
   postgres_data:
