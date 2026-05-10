@@ -2,11 +2,14 @@ import { createServer } from 'http';
 import app from './app';
 import { prisma } from './shared/utils/prisma';
 import { socketManager } from './shared/ws/socket.manager';
+import { validateEnv } from './shared/utils/env';
 
 const PORT = Number(process.env.PORT ?? 3333);
 
 async function bootstrap() {
   try {
+    validateEnv();
+
     await prisma.$connect();
     console.log('✅ Database connected');
 

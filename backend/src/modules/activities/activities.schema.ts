@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 const coordinateSchema = z.object({
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
 });
 
 export const startActivitySchema = z.object({
@@ -10,9 +10,9 @@ export const startActivitySchema = z.object({
 });
 
 export const finishActivitySchema = z.object({
-  route: z.array(coordinateSchema).min(2, 'Rota precisa ter pelo menos 2 pontos'),
-  durationSec: z.number().int().positive(),
-  polygon: z.array(coordinateSchema).min(3).optional(),
+  route: z.array(coordinateSchema).min(2, 'Rota precisa ter pelo menos 2 pontos').max(10000),
+  durationSec: z.number().int().positive().max(86400), // max 24h
+  polygon: z.array(coordinateSchema).min(3).max(500).optional(),
 });
 
 export const activityParamSchema = z.object({
