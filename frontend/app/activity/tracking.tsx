@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Platform, Alert } from 'react-native';
-import MapView, { Polyline, Polygon, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Polyline, Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import * as Location from 'expo-location';
@@ -12,10 +12,11 @@ import Animated, {
   withTiming,
   withSequence,
 } from 'react-native-reanimated';
-import { Pause, Play, Square, Navigation } from 'lucide-react-native';
+import { Pause, Play, Square } from 'lucide-react-native';
 import { formatDuration, formatDistance, formatArea } from '../../src/utils/format';
 import type { ActivityMode, Coordinate } from '../../src/types';
 import { MODE_COLORS, MODE_GLOW } from '../../src/utils/colors';
+import { apiFetch } from '../../src/lib/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -71,17 +72,21 @@ export default function TrackingScreen() {
   const [isConquered, setIsConquered] = useState(false);
   const [conqueredPolygon, setConqueredPolygon] = useState<Coordinate[] | null>(null);
   const [distance, setDistance] = useState(0);
+  const [activityId, setActivityId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationRef = useRef<Location.LocationSubscription | null>(null);
   const conqueredRef = useRef(false);
+  const routeRef = useRef<Coordinate[]>([]);
+  const conqueredPolygonRef = useRef<Coordinate[] | null>(null);
 
   // Pulse animation for conquest
   const pulseScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(1);
 
   useEffect(() => {
-    requestAndStart();
+    startActivity();
     return () => {
       locationRef.current?.remove();
       if (timerRef.current) clearInterval(timerRef.current);
@@ -97,7 +102,7 @@ export default function TrackingScreen() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isPaused]);
 
-  const requestAndStart = async () => {
+  const startActivity = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permissão de GPS', 'Precisamos da localização para rastrear sua atividade.', [
@@ -105,6 +110,14 @@ export default function TrackingScreen() {
       ]);
       return;
     }
+
+    // Create activity on backend (non-blocking — track locally even if API fails)
+    apiFetch<{ id: string }>('/api/activities', {
+      method: 'POST',
+      body: JSON.stringify({ mode: activeMode.toUpperCase() }),
+    })
+      .then(res => setActivityId(res.id))
+      .catch(() => {});
 
     locationRef.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 2000, distanceInterval: 3 },
@@ -118,6 +131,7 @@ export default function TrackingScreen() {
 
         setRoute(prev => {
           const updated = [...prev, newCoord];
+          routeRef.current = updated;
 
           // update distance
           if (updated.length > 1) {
@@ -138,6 +152,7 @@ export default function TrackingScreen() {
             const distToStart = haversineKm(updated[0], newCoord) * 1000;
             if (distToStart < 30) {
               conqueredRef.current = true;
+              conqueredPolygonRef.current = updated;
               setIsConquered(true);
               setConqueredPolygon(updated);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -175,22 +190,48 @@ export default function TrackingScreen() {
       {
         text: 'Finalizar',
         style: 'destructive',
-        onPress: () => {
-          locationRef.current?.remove();
-          if (timerRef.current) clearInterval(timerRef.current);
-          router.replace({
-            pathname: '/activity/result',
-            params: {
-              mode: activeMode,
-              elapsed: String(elapsed),
-              distance: String(distance.toFixed(3)),
-              area: String(conqueredPolygon ? Math.round(polygonAreaM2(conqueredPolygon)) : 0),
-              conquered: conqueredPolygon ? '1' : '0',
-            },
-          });
-        },
+        onPress: finishActivity,
       },
     ]);
+  };
+
+  const finishActivity = async () => {
+    locationRef.current?.remove();
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsSaving(true);
+
+    const currentRoute = routeRef.current;
+    const polygon = conqueredPolygonRef.current;
+    let speedViolation = null;
+
+    if (activityId) {
+      try {
+        const body: Record<string, unknown> = {
+          route: currentRoute,
+          durationSec: elapsed,
+        };
+        if (polygon && polygon.length >= 3) body.polygon = polygon;
+
+        const res = await apiFetch<{ activity: unknown; territory: unknown; speedViolation: unknown }>(
+          `/api/activities/${activityId}/finish`,
+          { method: 'PATCH', body: JSON.stringify(body) },
+        );
+        speedViolation = res.speedViolation;
+      } catch {}
+    }
+
+    router.replace({
+      pathname: '/activity/result',
+      params: {
+        mode: activeMode,
+        elapsed: String(elapsed),
+        distance: String(distance.toFixed(3)),
+        area: String(polygon ? Math.round(polygonAreaM2(polygon)) : 0),
+        conquered: polygon && !speedViolation ? '1' : '0',
+        polygon: polygon ? JSON.stringify(polygon) : '',
+        speedViolation: speedViolation ? JSON.stringify(speedViolation) : '',
+      },
+    });
   };
 
   const calories = Math.round(elapsed / 60 * (activeMode === 'race' ? 10 : activeMode === 'bike' ? 7 : 6));

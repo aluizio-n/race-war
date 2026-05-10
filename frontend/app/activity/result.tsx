@@ -21,9 +21,22 @@ const { width } = Dimensions.get('window');
 const MODE_LABEL = { race: 'Race War', bike: 'Bike War', skate: 'Skate War' };
 const MODE_EMOJI = { race: '🏃', bike: '🚲', skate: '🛹' };
 
+interface SpeedViolation {
+  avgSpeedKmh: number;
+  limitKmh: number;
+}
+
 export default function ResultScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mode: string; elapsed: string; distance: string; area: string; conquered: string }>();
+  const params = useLocalSearchParams<{
+    mode: string;
+    elapsed: string;
+    distance: string;
+    area: string;
+    conquered: string;
+    polygon: string;
+    speedViolation: string;
+  }>();
 
   const mode = (params.mode ?? 'race') as ActivityMode;
   const elapsed = parseInt(params.elapsed ?? '0', 10);
@@ -31,6 +44,19 @@ export default function ResultScreen() {
   const areaN = parseInt(params.area ?? '0', 10);
   const isConquered = params.conquered === '1';
   const color = MODE_COLORS[mode];
+
+  const realPolygon: Array<{ latitude: number; longitude: number }> | null =
+    params.polygon ? JSON.parse(params.polygon) : null;
+  const speedViolation: SpeedViolation | null =
+    params.speedViolation ? JSON.parse(params.speedViolation) : null;
+
+  // Compute map center from real polygon, fallback to hardcoded
+  const mapCenter = realPolygon && realPolygon.length > 0
+    ? {
+        latitude: realPolygon.reduce((s, c) => s + c.latitude, 0) / realPolygon.length,
+        longitude: realPolygon.reduce((s, c) => s + c.longitude, 0) / realPolygon.length,
+      }
+    : { latitude: -23.555, longitude: -46.631 };
 
   const calories = Math.round((elapsed / 60) * (mode === 'race' ? 10 : mode === 'bike' ? 7 : 6));
   const pace = distanceKm > 0 ? (elapsed / 60) / distanceKm : 0;
@@ -67,27 +93,31 @@ export default function ResultScreen() {
     } catch {}
   };
 
-  // Mock polygon for display
-  const mockPolygon = [
-    { latitude: -23.555, longitude: -46.633 },
-    { latitude: -23.553, longitude: -46.629 },
-    { latitude: -23.557, longitude: -46.627 },
-    { latitude: -23.559, longitude: -46.631 },
-  ];
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
       >
+        {/* Speed violation warning */}
+        {speedViolation && (
+          <View style={{ margin: 20, marginBottom: 0, backgroundColor: 'rgba(239,68,68,0.12)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#EF4444' }}>
+            <Text style={{ color: '#EF4444', fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 4 }}>
+              ⚠️ Velocidade suspeita detectada
+            </Text>
+            <Text style={{ color: '#94A3B8', fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+              Velocidade média: {speedViolation.avgSpeedKmh.toFixed(1)} km/h (limite: {speedViolation.limitKmh} km/h). O território não foi registrado.
+            </Text>
+          </View>
+        )}
+
         {/* Header */}
         <Animated.View style={[{ alignItems: 'center', paddingTop: 24, paddingBottom: 20, paddingHorizontal: 20 }, titleStyle]}>
           <Text style={{ fontSize: 52, marginBottom: 12 }}>
-            {isConquered ? '🎖️' : '⚡'}
+            {speedViolation ? '🚫' : isConquered ? '🎖️' : '⚡'}
           </Text>
           <Text style={{ fontSize: 26, fontFamily: 'Montserrat_900Black', color: '#F8FAFC', textAlign: 'center' }}>
-            {isConquered ? 'Território Conquistado!' : 'Batalha Finalizada'}
+            {speedViolation ? 'Conquista Bloqueada' : isConquered ? 'Território Conquistado!' : 'Batalha Finalizada'}
           </Text>
           <View
             style={{
@@ -117,7 +147,7 @@ export default function ResultScreen() {
           <MapView
             style={{ width: '100%', height: '100%' }}
             provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-            initialRegion={{ latitude: -23.555, longitude: -46.631, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
+            initialRegion={{ latitude: mapCenter.latitude, longitude: mapCenter.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
             scrollEnabled={false}
             zoomEnabled={false}
             rotateEnabled={false}
@@ -129,14 +159,16 @@ export default function ResultScreen() {
               { featureType: 'poi', stylers: [{ visibility: 'off' }] },
             ]}
           >
-            <Polygon
-              coordinates={mockPolygon}
-              fillColor={`${color}40`}
-              strokeColor={color}
-              strokeWidth={3}
-            />
+            {realPolygon && realPolygon.length >= 3 && (
+              <Polygon
+                coordinates={realPolygon}
+                fillColor={`${color}40`}
+                strokeColor={color}
+                strokeWidth={3}
+              />
+            )}
           </MapView>
-          {isConquered && (
+          {isConquered && !speedViolation && (
             <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, backgroundColor: `${color}20`, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: color }}>
               <Text style={{ color, fontSize: 12, fontFamily: 'Inter_700Bold' }}>{formatArea(areaN)}</Text>
             </View>

@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Platform, ListRenderItemInfo } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Trophy } from 'lucide-react-native';
-import { SkeletonCard } from '../../src/components/ui/SkeletonLoader';
 import { formatArea } from '../../src/utils/format';
 import type { ActivityMode } from '../../src/types';
 import { MODE_COLORS } from '../../src/utils/colors';
+import { apiFetch } from '../../src/lib/api';
+import { useAuth } from '../../src/context/AuthContext';
 
 const TABS: { key: 'global' | ActivityMode; label: string }[] = [
   { key: 'global', label: '🌍 Global' },
@@ -15,33 +15,37 @@ const TABS: { key: 'global' | ActivityMode; label: string }[] = [
   { key: 'skate', label: '🛹 Skate' },
 ];
 
-interface LeaderboardUser {
+interface LeaderboardEntry {
   rank: number;
-  name: string;
-  nickname: string;
-  area: number;
-  mode: ActivityMode;
-  isMe?: boolean;
+  user: { id: string; name: string; nickname: string };
+  totalAreaM2: number;
 }
 
-const MOCK_DATA: LeaderboardUser[] = [
-  { rank: 1, name: 'Carlos Silva', nickname: '@general_carlos', area: 284000, mode: 'race' },
-  { rank: 2, name: 'Ana Paula', nickname: '@queenpaula', area: 231000, mode: 'bike' },
-  { rank: 3, name: 'Rafael Lima', nickname: '@skate_lord', area: 196000, mode: 'skate' },
-  { rank: 4, name: 'Beatriz Costa', nickname: '@bea_runs', area: 174000, mode: 'race' },
-  { rank: 5, name: 'Lucas Mendes', nickname: '@luca_bike', area: 152000, mode: 'bike' },
-  { rank: 6, name: 'Mariana Torres', nickname: '@mari_skate', area: 138000, mode: 'skate' },
-  { rank: 7, name: 'Pedro Alves', nickname: '@pedro_war', area: 121000, mode: 'race' },
-  { rank: 8, name: 'Julia Santos', nickname: '@juli_speed', area: 109000, mode: 'race' },
-  { rank: 9, name: 'André Rocha', nickname: '@andre_roll', area: 97000, mode: 'skate' },
-  { rank: 10, name: 'Fernanda Melo', nickname: '@fer_cycle', area: 88000, mode: 'bike' },
-  { rank: 47, name: 'Você', nickname: '@general_you', area: 12400, mode: 'race', isMe: true },
-];
+interface MyRank {
+  rank: number;
+  totalAreaM2: number;
+}
 
 export default function LeaderboardScreen() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'global' | ActivityMode>('global');
+  const [data, setData] = useState<LeaderboardEntry[]>([]);
+  const [myRank, setMyRank] = useState<MyRank | null>(null);
 
-  const filtered = activeTab === 'global' ? MOCK_DATA : MOCK_DATA.filter(u => u.mode === activeTab || u.isMe);
+  const load = useCallback(async () => {
+    const mode = activeTab === 'global' ? '' : `&mode=${activeTab.toUpperCase()}`;
+    const [listRes, rankRes] = await Promise.allSettled([
+      apiFetch<LeaderboardEntry[]>(`/api/leaderboard?limit=50${mode}`),
+      apiFetch<MyRank>(`/api/leaderboard/me${activeTab !== 'global' ? `?mode=${activeTab.toUpperCase()}` : ''}`),
+    ]);
+    if (listRes.status === 'fulfilled') setData(listRes.value);
+    if (rankRes.status === 'fulfilled') setMyRank(rankRes.value);
+  }, [activeTab]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const top3 = data.slice(0, 3);
+  const rest = data.slice(3);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }} edges={['top']}>
@@ -84,24 +88,29 @@ export default function LeaderboardScreen() {
       </View>
 
       {/* Top 3 podium */}
-      {activeTab === 'global' && (
+      {top3.length >= 3 && (
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-          <Podium data={MOCK_DATA.slice(0, 3)} />
+          <Podium data={top3} />
         </View>
       )}
 
       {/* List */}
       <FlatList
-        data={filtered.filter(u => !u.isMe && u.rank > 3)}
+        data={rest}
         keyExtractor={item => String(item.rank)}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 100 : 80 }}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }: ListRenderItemInfo<LeaderboardUser>) => <LeaderRow item={item} />}
+        renderItem={({ item }: ListRenderItemInfo<LeaderboardEntry>) => (
+          <LeaderRow item={item} isMe={item.user.id === user?.id} />
+        )}
         ListFooterComponent={
-          MOCK_DATA.find(u => u.isMe) ? (
+          myRank && user ? (
             <View style={{ marginTop: 8 }}>
               <View style={{ height: 1, backgroundColor: '#334155', marginBottom: 8 }} />
-              <LeaderRow item={MOCK_DATA.find(u => u.isMe)!} />
+              <LeaderRow
+                item={{ rank: myRank.rank, user: { id: user.id, name: user.name, nickname: user.nickname }, totalAreaM2: myRank.totalAreaM2 }}
+                isMe
+              />
             </View>
           ) : null
         }
@@ -110,18 +119,18 @@ export default function LeaderboardScreen() {
   );
 }
 
-function Podium({ data }: { data: LeaderboardUser[] }) {
-  const order = [data[1], data[0], data[2]]; // 2nd, 1st, 3rd
+function Podium({ data }: { data: LeaderboardEntry[] }) {
+  const order = [data[1], data[0], data[2]];
   const heights = [80, 100, 60];
   const medals = ['🥈', '🥇', '🥉'];
   const colors = ['#94A3B8', '#F59E0B', '#CD7F32'];
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 8 }}>
-      {order.map((user, i) => (
-        <View key={user.rank} style={{ flex: 1, alignItems: 'center' }}>
+      {order.map((entry, i) => (
+        <View key={entry.rank} style={{ flex: 1, alignItems: 'center' }}>
           <Text style={{ fontSize: 11, color: '#94A3B8', marginBottom: 4, fontFamily: 'Inter_500Medium' }}>
-            {user.nickname}
+            {entry.user.nickname}
           </Text>
           <Text style={{ fontSize: 22, marginBottom: 4 }}>{medals[i]}</Text>
           <View
@@ -138,7 +147,7 @@ function Podium({ data }: { data: LeaderboardUser[] }) {
             }}
           >
             <Text style={{ color: colors[i], fontSize: 14, fontFamily: 'Montserrat_700Bold' }}>
-              #{user.rank}
+              #{entry.rank}
             </Text>
           </View>
         </View>
@@ -147,9 +156,8 @@ function Podium({ data }: { data: LeaderboardUser[] }) {
   );
 }
 
-function LeaderRow({ item }: { item: LeaderboardUser }) {
-  const color = MODE_COLORS[item.mode];
-  const isMe = item.isMe;
+function LeaderRow({ item, isMe }: { item: LeaderboardEntry; isMe?: boolean }) {
+  const color = isMe ? '#22C55E' : '#06B6D4';
 
   return (
     <View
@@ -181,17 +189,17 @@ function LeaderRow({ item }: { item: LeaderboardUser }) {
         }}
       >
         <Text style={{ color, fontSize: 14, fontFamily: 'Montserrat_700Bold' }}>
-          {item.name.charAt(0)}
+          {item.user.name.charAt(0).toUpperCase()}
         </Text>
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ color: isMe ? '#22C55E' : '#F8FAFC', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
-          {isMe ? 'Você' : item.name}
+          {isMe ? 'Você' : item.user.name}
         </Text>
-        <Text style={{ color: '#475569', fontSize: 12, fontFamily: 'Inter_400Regular' }}>{item.nickname}</Text>
+        <Text style={{ color: '#475569', fontSize: 12, fontFamily: 'Inter_400Regular' }}>@{item.user.nickname}</Text>
       </View>
       <Text style={{ color, fontSize: 13, fontFamily: 'Inter_700Bold' }}>
-        {formatArea(item.area)}
+        {formatArea(item.totalAreaM2)}
       </Text>
     </View>
   );

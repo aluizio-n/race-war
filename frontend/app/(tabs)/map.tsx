@@ -1,49 +1,22 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Platform } from 'react-native';
-import MapView, { Polygon, PROVIDER_GOOGLE, MapViewProps } from 'react-native-maps';
+import MapView, { Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Layers, Filter } from 'lucide-react-native';
+import { Layers } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import type { ActivityMode } from '../../src/types';
 import { MODE_COLORS } from '../../src/utils/colors';
+import { apiFetch } from '../../src/lib/api';
 
 const { width, height } = Dimensions.get('window');
 
-const MOCK_TERRITORIES = [
-  {
-    id: '1',
-    mode: 'race' as ActivityMode,
-    userName: 'General_João',
-    polygon: [
-      { latitude: -23.555, longitude: -46.633 },
-      { latitude: -23.553, longitude: -46.630 },
-      { latitude: -23.557, longitude: -46.628 },
-      { latitude: -23.559, longitude: -46.631 },
-    ],
-  },
-  {
-    id: '2',
-    mode: 'bike' as ActivityMode,
-    userName: 'CycleKing',
-    polygon: [
-      { latitude: -23.560, longitude: -46.640 },
-      { latitude: -23.558, longitude: -46.636 },
-      { latitude: -23.562, longitude: -46.634 },
-      { latitude: -23.564, longitude: -46.638 },
-    ],
-  },
-  {
-    id: '3',
-    mode: 'skate' as ActivityMode,
-    userName: 'SkateGeneral',
-    polygon: [
-      { latitude: -23.548, longitude: -46.628 },
-      { latitude: -23.546, longitude: -46.625 },
-      { latitude: -23.550, longitude: -46.622 },
-      { latitude: -23.552, longitude: -46.625 },
-    ],
-  },
-];
+interface ApiTerritory {
+  id: string;
+  mode: 'RACE' | 'BIKE' | 'SKATE';
+  polygon: Array<{ latitude: number; longitude: number }>;
+  areaM2: number;
+  user: { id: string; name: string; nickname: string };
+}
 
 const FILTERS: { key: ActivityMode | 'all'; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -65,10 +38,21 @@ const MAP_STYLE = [
 
 export default function MapScreen() {
   const [activeFilter, setActiveFilter] = useState<ActivityMode | 'all'>('all');
-  const [selectedTerritory, setSelectedTerritory] = useState<(typeof MOCK_TERRITORIES)[0] | null>(null);
+  const [territories, setTerritories] = useState<ApiTerritory[]>([]);
+  const [selectedTerritory, setSelectedTerritory] = useState<ApiTerritory | null>(null);
   const mapRef = useRef<MapView>(null);
 
-  const filtered = MOCK_TERRITORIES.filter(t => activeFilter === 'all' || t.mode === activeFilter);
+  const load = useCallback(async () => {
+    try {
+      const res = await apiFetch<{ items: ApiTerritory[] }>('/api/territories?limit=200');
+      setTerritories(res.items);
+    } catch {}
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const modeFilter = activeFilter === 'all' ? null : activeFilter.toUpperCase();
+  const filtered = territories.filter(t => !modeFilter || t.mode === modeFilter);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0F172A' }}>
@@ -89,7 +73,8 @@ export default function MapScreen() {
         onPress={() => setSelectedTerritory(null)}
       >
         {filtered.map(t => {
-          const color = MODE_COLORS[t.mode];
+          const mode = t.mode.toLowerCase() as ActivityMode;
+          const color = MODE_COLORS[mode];
           return (
             <Polygon
               key={t.id}
@@ -147,44 +132,31 @@ export default function MapScreen() {
       </SafeAreaView>
 
       {/* Territory info popup */}
-      {selectedTerritory && (
-        <View
-          style={{
-            position: 'absolute',
-            bottom: Platform.OS === 'ios' ? 100 : 80,
-            left: 16,
-            right: 16,
-          }}
-        >
-          <BlurWrapper padding={16}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  backgroundColor: `${MODE_COLORS[selectedTerritory.mode]}20`,
-                  borderWidth: 1,
-                  borderColor: MODE_COLORS[selectedTerritory.mode],
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ fontSize: 20 }}>{selectedTerritory.mode === 'race' ? '🏃' : selectedTerritory.mode === 'bike' ? '🚲' : '🛹'}</Text>
+      {selectedTerritory && (() => {
+        const mode = selectedTerritory.mode.toLowerCase() as ActivityMode;
+        const color = MODE_COLORS[mode];
+        const emoji = mode === 'race' ? '🏃' : mode === 'bike' ? '🚲' : '🛹';
+        return (
+          <View style={{ position: 'absolute', bottom: Platform.OS === 'ios' ? 100 : 80, left: 16, right: 16 }}>
+            <BlurWrapper padding={16}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: `${color}20`, borderWidth: 1, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 20 }}>{emoji}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#F8FAFC', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
+                    {selectedTerritory.user.name}
+                  </Text>
+                  <Text style={{ color, fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 2 }}>
+                    Líder da Região
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 22 }}>👑</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#F8FAFC', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
-                  {selectedTerritory.userName}
-                </Text>
-                <Text style={{ color: MODE_COLORS[selectedTerritory.mode], fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 2 }}>
-                  Líder da Região
-                </Text>
-              </View>
-              <Text style={{ fontSize: 22 }}>👑</Text>
-            </View>
-          </BlurWrapper>
-        </View>
-      )}
+            </BlurWrapper>
+          </View>
+        );
+      })()}
     </View>
   );
 }
