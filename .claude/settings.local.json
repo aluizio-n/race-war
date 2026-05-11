@@ -4,7 +4,20 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\aluizio\\\\repositories\\\\race-war\" -Name | Where-Object { $_ -ne \"node_modules\" })",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\aluizio\\\\repositories\\\\race-war\\\\app\" -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\(\"C:\\\\Users\\\\aluizio\\\\repositories\\\\race-war\\\\\", \"\"\\) })",
       "PowerShell(cd \"C:\\\\Users\\\\aluizio\\\\repositories\\\\race-war\"; $allFiles = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch \"node_modules|\\\\.claude\" } | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\(\"C:\\\\Users\\\\aluizio\\\\repositories\\\\race-war\\\\\", \"\"\\) }; $allFiles | Sort-Object)",
-      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; Write-Output \"Iniciando Docker Desktop...\")"
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; Write-Output \"Iniciando Docker Desktop...\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\aluizio\\\\repositories\\\\race-war\\\\backend\" -Recurse -Force)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(npm install *)",
+      "PowerShell(auth *)",
+      "Bash(Test-Path *)",
+      "PowerShell(docker version *)",
+      "PowerShell(netstat *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(docker start racewar-expo-dev *)",
+      "PowerShell(docker exec racewar-postgres-dev *)",
+      "PowerShell(docker exec racewar-api-dev *)",
+      "PowerShell(docker exec racewar-expo-dev *)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8081/status\" -TimeoutSec 5 2>&1)"
     ]
   }
 }

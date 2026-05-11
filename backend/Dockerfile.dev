@@ -1,4 +1,5 @@
 FROM node:22-alpine
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 COPY package*.json ./
@@ -10,4 +11,4 @@ RUN npx prisma generate
 # src/ is bind-mounted at runtime — no COPY needed here
 EXPOSE 3333
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx watch src/server.ts"]
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && npx tsx watch src/server.ts"]

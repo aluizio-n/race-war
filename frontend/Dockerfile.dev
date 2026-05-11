@@ -4,7 +4,7 @@ RUN apk add --no-cache bash
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Source is bind-mounted at runtime.
 # node_modules stays in the container image (anonymous volume in compose).
