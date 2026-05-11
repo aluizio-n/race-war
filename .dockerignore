@@ -1,0 +1,12 @@
+**/.git
+**/.gitignore
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/dist
+**/.expo
+**/*.log
+**/README.md
+**/.vscode
+**/.claude

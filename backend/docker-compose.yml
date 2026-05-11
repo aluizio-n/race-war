@@ -1,3 +1,8 @@
+# Standalone backend-only compose (kept for backward compatibility).
+# For the full stack use the root-level:
+#   docker-compose.dev.yml  — development (API + Expo + Postgres)
+#   docker-compose.prod.yml — production  (API + Nginx + Postgres)
+
 services:
   postgres:
     image: postgres:16-alpine

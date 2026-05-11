@@ -6,17 +6,19 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Mail, Lock, LogIn } from 'lucide-react-native';
+import { Mail, Lock } from 'lucide-react-native';
 import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
+import { useAuth } from '../../src/context/AuthContext';
+import { ApiError } from '../../src/lib/api';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +27,7 @@ export default function LoginScreen() {
   const validate = () => {
     const e: typeof errors = {};
     if (!email.includes('@')) e.email = 'Email inválido';
-    if (password.length < 6) e.password = 'Mínimo 6 caracteres';
+    if (password.length < 8) e.password = 'Mínimo 8 caracteres';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -33,10 +35,15 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await login(email, password);
       router.replace('/(tabs)/home');
-    }, 1200);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Erro ao conectar com o servidor';
+      Alert.alert('Falha no login', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

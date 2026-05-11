@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mail, Lock, User, AtSign } from 'lucide-react-native';
 import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
+import { useAuth } from '../../src/context/AuthContext';
+import { ApiError } from '../../src/lib/api';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { register } = useAuth();
   const [form, setForm] = useState({ name: '', nickname: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -20,18 +23,25 @@ export default function RegisterScreen() {
     if (!form.name.trim()) e.name = 'Nome obrigatório';
     if (!form.nickname.trim()) e.nickname = 'Nickname obrigatório';
     if (!form.email.includes('@')) e.email = 'Email inválido';
-    if (form.password.length < 6) e.password = 'Mínimo 6 caracteres';
+    if (form.password.length < 8) e.password = 'Mínimo 8 caracteres';
+    if (!/[A-Z]/.test(form.password)) e.password = 'Precisa de ao menos uma letra maiúscula';
+    if (!/[0-9]/.test(form.password)) e.password = 'Precisa de ao menos um número';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await register(form.name, form.nickname, form.email, form.password);
       router.replace('/(tabs)/home');
-    }, 1400);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Erro ao criar conta';
+      Alert.alert('Falha no cadastro', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

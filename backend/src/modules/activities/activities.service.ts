@@ -4,7 +4,9 @@ import {
   routeTotalDistanceKm,
   polygonAreaM2,
   polygonCenter,
+  validateRouteSpeed,
 } from '../../shared/utils/geo';
+import { socketManager } from '../../shared/ws/socket.manager';
 import type { StartActivityInput, FinishActivityInput, ListActivitiesInput } from './activities.schema';
 import { challengesService } from '../challenges/challenges.service';
 
@@ -27,7 +29,12 @@ export class ActivitiesService {
 
     const distanceKm = routeTotalDistanceKm(input.route);
     const paceMinKm = distanceKm > 0 ? input.durationSec / 60 / distanceKm : null;
-    const calories = Math.round((input.durationSec / 60) * (activity.mode === 'RACE' ? 10 : activity.mode === 'BIKE' ? 7 : 6));
+    const calories = Math.round(
+      (input.durationSec / 60) * (activity.mode === 'RACE' ? 10 : activity.mode === 'BIKE' ? 7 : 6),
+    );
+
+    // Validate speed before any territory or challenge logic
+    const speedViolation = validateRouteSpeed(input.route, input.durationSec, activity.mode);
 
     const updated = await prisma.activity.update({
       where: { id: activityId },
@@ -41,7 +48,18 @@ export class ActivitiesService {
       },
     });
 
-    // Create territory if polygon provided
+    // Speed violation: block territory creation and challenge progress, notify client
+    if (speedViolation) {
+      socketManager.emitToUser(userId, 'speed_violation', {
+        activityId,
+        mode: activity.mode,
+        ...speedViolation,
+      });
+
+      return { activity: updated, territory: null, speedViolation };
+    }
+
+    // Create territory if polygon provided and speed is valid
     let territory = null;
     if (input.polygon && input.polygon.length >= 3) {
       const areaM2 = polygonAreaM2(input.polygon);
@@ -59,7 +77,6 @@ export class ActivitiesService {
         },
       });
 
-      // Update challenge progress asynchronously
       challengesService
         .updateProgressAfterActivity(userId, activity.mode, { distanceKm, territories: 1, areaM2 })
         .catch(console.error);
@@ -69,7 +86,7 @@ export class ActivitiesService {
         .catch(console.error);
     }
 
-    return { activity: updated, territory };
+    return { activity: updated, territory, speedViolation: null };
   }
 
   async list(userId: string, input: ListActivitiesInput) {

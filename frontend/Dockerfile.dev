@@ -1,0 +1,19 @@
+FROM node:22-alpine
+RUN apk add --no-cache bash
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps
+
+# Source is bind-mounted at runtime.
+# node_modules stays in the container image (anonymous volume in compose).
+
+EXPOSE 8081 19000 19001
+
+ENV EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+
+# REACT_NATIVE_PACKAGER_HOSTNAME must be set to the host machine's LAN IP
+# so that physical devices and emulators can reach the Metro bundler.
+# Pass it via HOST_IP in docker-compose.dev.yml.
+CMD ["npx", "expo", "start", "--host", "lan", "--port", "8081"]

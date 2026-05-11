@@ -1,5 +1,7 @@
 import { prisma } from '../../shared/utils/prisma';
 import { ConflictError, NotFoundError } from '../../shared/errors/AppError';
+import { socketManager } from '../../shared/ws/socket.manager';
+import { sendPushToUser } from '../../shared/notifications/push.service';
 import type { UpdateProfileInput } from './users.schema';
 
 const PUBLIC_SELECT = {
@@ -82,14 +84,53 @@ export class UsersService {
     });
     if (existing) throw new ConflictError('Solicitação já existe');
 
-    return prisma.friendship.create({ data: { senderId, receiverId } });
+    const [friendship, sender] = await Promise.all([
+      prisma.friendship.create({ data: { senderId, receiverId } }),
+      prisma.user.findUnique({ where: { id: senderId }, select: PUBLIC_SELECT }),
+    ]);
+
+    const payload = { friendship, sender };
+
+    // Notifica receiver em tempo real
+    socketManager.emitToUser(receiverId, 'friend_request_received', payload);
+    // Confirma para o sender em tempo real
+    socketManager.emitToUser(senderId, 'friend_request_sent', payload);
+
+    // Push notification para o receiver (fire-and-forget)
+    sendPushToUser(receiverId, {
+      title: 'Nova solicitação de amizade',
+      body: `${sender?.nickname ?? 'Alguém'} quer ser seu amigo no Race War!`,
+      data: { type: 'friend_request_received', friendshipId: friendship.id, senderId },
+    }).catch(() => {});
+
+    return friendship;
   }
 
   async acceptFriendRequest(userId: string, requestId: string) {
-    const req = await prisma.friendship.findFirst({ where: { id: requestId, receiverId: userId } });
-    if (!req) throw new NotFoundError('Solicitação de amizade');
+    const friendRequest = await prisma.friendship.findFirst({
+      where: { id: requestId, receiverId: userId },
+    });
+    if (!friendRequest) throw new NotFoundError('Solicitação de amizade');
 
-    return prisma.friendship.update({ where: { id: requestId }, data: { accepted: true } });
+    const [updated, acceptor] = await Promise.all([
+      prisma.friendship.update({ where: { id: requestId }, data: { accepted: true } }),
+      prisma.user.findUnique({ where: { id: userId }, select: PUBLIC_SELECT }),
+    ]);
+
+    const payload = { friendship: updated, acceptor };
+
+    // Notifica ambos em tempo real
+    socketManager.emitToUser(friendRequest.senderId, 'friend_request_accepted', payload);
+    socketManager.emitToUser(friendRequest.receiverId, 'friend_request_accepted', payload);
+
+    // Push notification para quem enviou a solicitação (fire-and-forget)
+    sendPushToUser(friendRequest.senderId, {
+      title: 'Solicitação aceita!',
+      body: `${acceptor?.nickname ?? 'Seu amigo'} aceitou sua solicitação de amizade!`,
+      data: { type: 'friend_request_accepted', friendshipId: updated.id },
+    }).catch(() => {});
+
+    return updated;
   }
 
   async getFriends(userId: string) {

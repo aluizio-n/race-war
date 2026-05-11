@@ -1,33 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Settings, UserPlus, Share2, Map, Flame, Trophy, Star } from 'lucide-react-native';
-import { Card } from '../../src/components/ui/Card';
 import { StatBadge } from '../../src/components/ui/StatBadge';
 import { formatArea, formatDistance } from '../../src/utils/format';
 import type { ActivityMode } from '../../src/types';
 import { MODE_COLORS } from '../../src/utils/colors';
+import { useAuth } from '../../src/context/AuthContext';
+import { apiFetch } from '../../src/lib/api';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
-const BADGES = [
-  { id: '1', emoji: '🏆', name: 'Primeiro Território', color: '#F59E0B', unlocked: true },
-  { id: '2', emoji: '🔥', name: 'Em Chamas', color: '#EF4444', unlocked: true },
-  { id: '3', emoji: '🌊', name: 'Ciclista Aquático', color: '#06B6D4', unlocked: true },
-  { id: '4', emoji: '⚡', name: 'Velocista', color: '#F59E0B', unlocked: false },
-  { id: '5', emoji: '🎯', name: '10 Quarteirões', color: '#22C55E', unlocked: false },
-  { id: '6', emoji: '👑', name: 'General Supremo', color: '#A855F7', unlocked: false },
-];
+interface ApiActivity {
+  id: string;
+  mode: 'RACE' | 'BIKE' | 'SKATE';
+  distanceKm: number;
+  durationSec: number;
+  calories: number;
+  startedAt: string;
+  territory: { areaM2: number } | null;
+}
 
-const RECENT = [
-  { mode: 'race' as ActivityMode, area: 12400, distance: 2.3, date: 'Hoje' },
-  { mode: 'bike' as ActivityMode, area: 34200, distance: 6.1, date: 'Ontem' },
-  { mode: 'skate' as ActivityMode, area: 8100, distance: 1.8, date: 'Segunda' },
-];
+interface TerritoryStats {
+  totalAreaM2: number;
+  totalCount: number;
+  byMode: Array<{ mode: string; areaM2: number; count: number }>;
+}
 
 export default function ProfileScreen() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'stats' | 'badges' | 'history'>('stats');
+  const [activities, setActivities] = useState<ApiActivity[]>([]);
+  const [stats, setStats] = useState<TerritoryStats | null>(null);
+  const [rank, setRank] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    const [actRes, statsRes, rankRes] = await Promise.allSettled([
+      apiFetch<{ items: ApiActivity[] }>('/api/activities?limit=10'),
+      apiFetch<TerritoryStats>('/api/territories/my/stats'),
+      apiFetch<{ rank: number }>('/api/leaderboard/me'),
+    ]);
+    if (actRes.status === 'fulfilled') setActivities(actRes.value.items);
+    if (statsRes.status === 'fulfilled') setStats(statsRes.value);
+    if (rankRes.status === 'fulfilled') setRank(rankRes.value.rank);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)/login');
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }} edges={['top']}>
@@ -38,6 +64,7 @@ export default function ProfileScreen() {
         {/* Header */}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
           <TouchableOpacity
+            onPress={handleLogout}
             style={{
               width: 38,
               height: 38,
@@ -71,14 +98,18 @@ export default function ProfileScreen() {
                   justifyContent: 'center',
                 }}
               >
-                <Text style={{ fontSize: 28, fontFamily: 'Montserrat_700Bold', color: '#0F172A' }}>V</Text>
+                <Text style={{ fontSize: 28, fontFamily: 'Montserrat_700Bold', color: '#0F172A' }}>
+                  {user?.name?.charAt(0).toUpperCase() ?? '?'}
+                </Text>
               </LinearGradient>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: '#F8FAFC', fontSize: 19, fontFamily: 'Montserrat_700Bold' }}>Você</Text>
-                <Text style={{ color: '#475569', fontSize: 13, marginTop: 2 }}>@general_you</Text>
+                <Text style={{ color: '#F8FAFC', fontSize: 19, fontFamily: 'Montserrat_700Bold' }}>{user?.name ?? '—'}</Text>
+                <Text style={{ color: '#475569', fontSize: 13, marginTop: 2 }}>@{user?.nickname ?? '—'}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
                   <Star size={12} color="#F59E0B" fill="#F59E0B" />
-                  <Text style={{ color: '#F59E0B', fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>Rank #47 Global</Text>
+                  <Text style={{ color: '#F59E0B', fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>
+                    Rank #{rank ?? '—'} Global
+                  </Text>
                 </View>
               </View>
             </View>
@@ -125,9 +156,9 @@ export default function ProfileScreen() {
 
         {/* Stats row */}
         <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 20 }}>
-          <StatBadge label="Territórios" value="12" color="#22C55E" icon={<Map size={14} color="#22C55E" />} />
-          <StatBadge label="Km Totais" value="48.2" color="#06B6D4" icon={<Flame size={14} color="#06B6D4" />} />
-          <StatBadge label="Medalhas" value="3" color="#F59E0B" icon={<Trophy size={14} color="#F59E0B" />} />
+          <StatBadge label="Territórios" value={String(stats?.totalCount ?? '—')} color="#22C55E" icon={<Map size={14} color="#22C55E" />} />
+          <StatBadge label="Km Totais" value={activities.reduce((s, a) => s + a.distanceKm, 0).toFixed(1)} color="#06B6D4" icon={<Flame size={14} color="#06B6D4" />} />
+          <StatBadge label="Atividades" value={String(activities.length)} color="#F59E0B" icon={<Trophy size={14} color="#F59E0B" />} />
         </View>
 
         {/* Tabs */}
@@ -157,28 +188,35 @@ export default function ProfileScreen() {
 
         {/* Tab content */}
         <View style={{ paddingHorizontal: 20 }}>
-          {activeTab === 'stats' && <StatsTab />}
+          {activeTab === 'stats' && <StatsTab stats={stats} activities={activities} />}
           {activeTab === 'badges' && <BadgesTab />}
-          {activeTab === 'history' && <HistoryTab />}
+          {activeTab === 'history' && <HistoryTab activities={activities} />}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function StatsTab() {
-  const stats = [
-    { label: 'Área Total Dominada', value: formatArea(54700), color: '#22C55E' },
-    { label: 'Km Race', value: formatDistance(24.3), color: '#22C55E' },
-    { label: 'Km Bike', value: formatDistance(18.6), color: '#06B6D4' },
-    { label: 'Km Skate', value: formatDistance(5.3), color: '#A855F7' },
-    { label: 'Tempo Total', value: '8h 42min', color: '#F59E0B' },
-    { label: 'Calorias', value: '3.240 kcal', color: '#EF4444' },
+function StatsTab({ stats, activities }: { stats: TerritoryStats | null; activities: ApiActivity[] }) {
+  const modeKm = (mode: string) =>
+    activities.filter(a => a.mode === mode).reduce((s, a) => s + a.distanceKm, 0);
+  const totalDurSec = activities.reduce((s, a) => s + (a.durationSec ?? 0), 0);
+  const totalCal = activities.reduce((s, a) => s + (a.calories ?? 0), 0);
+  const hours = Math.floor(totalDurSec / 3600);
+  const mins = Math.floor((totalDurSec % 3600) / 60);
+
+  const rows = [
+    { label: 'Área Total Dominada', value: formatArea(stats?.totalAreaM2 ?? 0), color: '#22C55E' },
+    { label: 'Km Race', value: formatDistance(modeKm('RACE')), color: '#22C55E' },
+    { label: 'Km Bike', value: formatDistance(modeKm('BIKE')), color: '#06B6D4' },
+    { label: 'Km Skate', value: formatDistance(modeKm('SKATE')), color: '#A855F7' },
+    { label: 'Tempo Total', value: `${hours}h ${mins}min`, color: '#F59E0B' },
+    { label: 'Calorias', value: `${totalCal.toLocaleString('pt-BR')} kcal`, color: '#EF4444' },
   ];
 
   return (
     <View style={{ gap: 8 }}>
-      {stats.map(s => (
+      {rows.map(s => (
         <View
           key={s.label}
           style={{
@@ -201,10 +239,19 @@ function StatsTab() {
   );
 }
 
+const STATIC_BADGES = [
+  { id: '1', emoji: '🏆', name: 'Primeiro Território', color: '#F59E0B', unlocked: true },
+  { id: '2', emoji: '🔥', name: 'Em Chamas', color: '#EF4444', unlocked: false },
+  { id: '3', emoji: '⚡', name: 'Velocista', color: '#F59E0B', unlocked: false },
+  { id: '4', emoji: '🎯', name: '10 Quarteirões', color: '#22C55E', unlocked: false },
+  { id: '5', emoji: '🌊', name: 'Ciclista', color: '#06B6D4', unlocked: false },
+  { id: '6', emoji: '👑', name: 'General Supremo', color: '#A855F7', unlocked: false },
+];
+
 function BadgesTab() {
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-      {BADGES.map(b => (
+      {STATIC_BADGES.map(b => (
         <View
           key={b.id}
           style={{
@@ -228,17 +275,28 @@ function BadgesTab() {
   );
 }
 
-function HistoryTab() {
-  const modeEmoji = { race: '🏃', bike: '🚲', skate: '🛹' };
-  const modeLabel = { race: 'Race', bike: 'Bike', skate: 'Skate' };
+function HistoryTab({ activities }: { activities: ApiActivity[] }) {
+  const modeEmoji = { RACE: '🏃', BIKE: '🚲', SKATE: '🛹' };
+  const modeLabel = { RACE: 'Race', BIKE: 'Bike', SKATE: 'Skate' };
+
+  if (activities.length === 0) {
+    return (
+      <Text style={{ color: '#475569', fontSize: 13, textAlign: 'center', marginTop: 12, fontFamily: 'Inter_400Regular' }}>
+        Nenhuma atividade ainda.
+      </Text>
+    );
+  }
 
   return (
     <View style={{ gap: 10 }}>
-      {RECENT.map((a, i) => {
-        const color = MODE_COLORS[a.mode];
+      {activities.map(a => {
+        const mode = a.mode as 'RACE' | 'BIKE' | 'SKATE';
+        const modeKey = mode.toLowerCase() as ActivityMode;
+        const color = MODE_COLORS[modeKey];
+        const date = new Date(a.startedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
         return (
           <View
-            key={i}
+            key={a.id}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -262,17 +320,19 @@ function HistoryTab() {
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 20 }}>{modeEmoji[a.mode]}</Text>
+              <Text style={{ fontSize: 20 }}>{modeEmoji[mode]}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#F8FAFC', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
-                {modeLabel[a.mode]} War
+                {modeLabel[mode]} War
               </Text>
-              <Text style={{ color: '#475569', fontSize: 12 }}>{a.date}</Text>
+              <Text style={{ color: '#475569', fontSize: 12 }}>{date}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ color, fontSize: 13, fontFamily: 'Inter_700Bold' }}>{formatArea(a.area)}</Text>
-              <Text style={{ color: '#475569', fontSize: 11 }}>{formatDistance(a.distance)}</Text>
+              {a.territory && (
+                <Text style={{ color, fontSize: 13, fontFamily: 'Inter_700Bold' }}>{formatArea(a.territory.areaM2)}</Text>
+              )}
+              <Text style={{ color: '#475569', fontSize: 11 }}>{formatDistance(a.distanceKm)}</Text>
             </View>
           </View>
         );

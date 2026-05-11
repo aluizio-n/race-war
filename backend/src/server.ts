@@ -1,21 +1,31 @@
+import { createServer } from 'http';
 import app from './app';
 import { prisma } from './shared/utils/prisma';
+import { socketManager } from './shared/ws/socket.manager';
+import { validateEnv } from './shared/utils/env';
 
 const PORT = Number(process.env.PORT ?? 3333);
 
 async function bootstrap() {
   try {
+    validateEnv();
+
     await prisma.$connect();
     console.log('✅ Database connected');
 
-    const server = app.listen(PORT, () => {
+    const httpServer = createServer(app);
+    socketManager.init(httpServer);
+
+    httpServer.listen(PORT, () => {
       console.log(`🚀 Race War API running on http://localhost:${PORT}`);
       console.log(`📋 Health: http://localhost:${PORT}/health`);
+      console.log(`📡 WebSocket: ws://localhost:${PORT}`);
+      console.log(`📖 Docs: http://localhost:${PORT}/api-docs`);
     });
 
     const shutdown = async (signal: string) => {
       console.log(`\n⚠️  ${signal} received — graceful shutdown`);
-      server.close(async () => {
+      httpServer.close(async () => {
         await prisma.$disconnect();
         console.log('🔌 Database disconnected');
         process.exit(0);

@@ -1,4 +1,4 @@
-import { ActivityMode, ChallengeStatus } from '@prisma/client';
+import { ActivityMode, ChallengeStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../shared/utils/prisma';
 
 interface ActivityProgress {
@@ -11,7 +11,6 @@ export class ChallengesService {
   async listForUser(userId: string, status?: ChallengeStatus) {
     const now = new Date();
 
-    // Auto-enroll user in active challenges they haven't joined yet
     const activeChallenges = await prisma.challenge.findMany({
       where: { startsAt: { lte: now }, expiresAt: { gt: now } },
     });
@@ -28,21 +27,14 @@ export class ChallengesService {
       });
     }
 
-    // Mark expired challenges
     await prisma.userChallenge.updateMany({
-      where: {
-        userId,
-        status: 'ACTIVE',
-        challenge: { expiresAt: { lte: now } },
-      },
+      where: { userId, status: 'ACTIVE', challenge: { expiresAt: { lte: now } } },
       data: { status: 'EXPIRED' },
     });
 
     return prisma.userChallenge.findMany({
       where: { userId, ...(status && { status }) },
-      include: {
-        challenge: true,
-      },
+      include: { challenge: true },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -59,34 +51,46 @@ export class ChallengesService {
 
     for (const uc of userChallenges) {
       const { challenge } = uc;
-
       let increment = 0;
 
       if (challenge.unit === 'km') {
-        // Only count if mode matches (or no mode filter)
-        if (!challenge.mode || challenge.mode === mode) {
-          increment = progress.distanceKm;
-        }
+        if (!challenge.mode || challenge.mode === mode) increment = progress.distanceKm;
       } else if (challenge.unit === 'territories') {
-        if (!challenge.mode || challenge.mode === mode) {
-          increment = progress.territories;
-        }
+        if (!challenge.mode || challenge.mode === mode) increment = progress.territories;
       } else if (challenge.unit === 'm2') {
-        if (!challenge.mode || challenge.mode === mode) {
-          increment = progress.areaM2;
-        }
+        if (!challenge.mode || challenge.mode === mode) increment = progress.areaM2;
       } else if (challenge.unit === 'days') {
-        // Check if user already incremented today
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+        // Use a serializable transaction to prevent double-counting concurrent activities
+        await prisma.$transaction(async (tx) => {
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
 
-        const todayActivity = await prisma.activity.count({
-          where: {
-            userId,
-            finishedAt: { gte: todayStart, not: null },
-          },
-        });
-        if (todayActivity === 1) increment = 1; // Only first activity of the day
+          const todayCount = await tx.activity.count({
+            where: { userId, finishedAt: { gte: todayStart, not: null } },
+          });
+
+          if (todayCount === 1) {
+            const current = await tx.userChallenge.findUnique({
+              where: { id: uc.id },
+              select: { currentValue: true },
+            });
+            if (!current) return;
+
+            const newValue = Math.min(current.currentValue + 1, challenge.targetValue);
+            const isCompleted = newValue >= challenge.targetValue;
+
+            await tx.userChallenge.update({
+              where: { id: uc.id },
+              data: {
+                currentValue: newValue,
+                status: isCompleted ? 'COMPLETED' : 'ACTIVE',
+                completedAt: isCompleted ? new Date() : null,
+              },
+            });
+          }
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+        continue;
       }
 
       if (increment <= 0) continue;
