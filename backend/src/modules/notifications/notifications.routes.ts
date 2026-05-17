@@ -24,4 +24,9 @@ router.delete(
   (req, res, next) => notificationsController.unsubscribe(req, res, next),
 );
 
+router.get('/', authMiddleware, (req, res, next) => notificationsController.list(req, res, next));
+router.get('/unread-count', authMiddleware, (req, res, next) => notificationsController.getUnreadCount(req, res, next));
+router.patch('/read-all', authMiddleware, (req, res, next) => notificationsController.markAllAsRead(req, res, next));
+router.patch('/:id/read', authMiddleware, (req, res, next) => notificationsController.markAsRead(req, res, next));
+
 export default router;
