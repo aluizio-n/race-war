@@ -1,5 +1,6 @@
 import { ActivityMode, ChallengeStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../shared/utils/prisma';
+import { notificationsService } from '../notifications/notifications.service';
 
 interface ActivityProgress {
   distanceKm: number;
@@ -87,6 +88,15 @@ export class ChallengesService {
                 completedAt: isCompleted ? new Date() : null,
               },
             });
+
+            if (isCompleted) {
+              notificationsService.create(userId, {
+                type: 'challenge_completed',
+                title: 'Desafio concluído!',
+                body: challenge.title,
+                data: { challengeId: challenge.id },
+              }).catch(() => {});
+            }
           }
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
@@ -106,6 +116,15 @@ export class ChallengesService {
           completedAt: isCompleted ? new Date() : null,
         },
       });
+
+      if (isCompleted) {
+        notificationsService.create(userId, {
+          type: 'challenge_completed',
+          title: 'Desafio concluído!',
+          body: challenge.title,
+          data: { challengeId: challenge.id },
+        }).catch(() => {});
+      }
     }
   }
 }
