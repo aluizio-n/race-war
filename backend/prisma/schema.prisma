@@ -37,6 +37,7 @@ model User {
   userChallenges    UserChallenge[]
   refreshTokens     RefreshToken[]
   pushSubscriptions PushSubscription[]
+  notifications     Notification[]
 
   @@map("users")
 }
@@ -150,4 +151,19 @@ model UserChallenge {
 
   @@unique([userId, challengeId])
   @@map("user_challenges")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String
+  title     String
+  body      String
+  data      Json?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
