@@ -2,6 +2,7 @@ import { prisma } from '../../shared/utils/prisma';
 import { ConflictError, NotFoundError } from '../../shared/errors/AppError';
 import { socketManager } from '../../shared/ws/socket.manager';
 import { sendPushToUser } from '../../shared/notifications/push.service';
+import { notificationsService } from '../notifications/notifications.service';
 import type { UpdateProfileInput } from './users.schema';
 
 const PUBLIC_SELECT = {
@@ -91,16 +92,20 @@ export class UsersService {
 
     const payload = { friendship, sender };
 
-    // Notifica receiver em tempo real
     socketManager.emitToUser(receiverId, 'friend_request_received', payload);
-    // Confirma para o sender em tempo real
     socketManager.emitToUser(senderId, 'friend_request_sent', payload);
 
-    // Push notification para o receiver (fire-and-forget)
     sendPushToUser(receiverId, {
       title: 'Nova solicitação de amizade',
       body: `${sender?.nickname ?? 'Alguém'} quer ser seu amigo no Race War!`,
       data: { type: 'friend_request_received', friendshipId: friendship.id, senderId },
+    }).catch(() => {});
+
+    notificationsService.create(receiverId, {
+      type: 'friend_request',
+      title: 'Nova solicitação de amizade',
+      body: `${sender?.nickname ?? 'Alguém'} quer ser seu amigo!`,
+      data: { senderId, friendshipId: friendship.id },
     }).catch(() => {});
 
     return friendship;
@@ -119,15 +124,20 @@ export class UsersService {
 
     const payload = { friendship: updated, acceptor };
 
-    // Notifica ambos em tempo real
     socketManager.emitToUser(friendRequest.senderId, 'friend_request_accepted', payload);
     socketManager.emitToUser(friendRequest.receiverId, 'friend_request_accepted', payload);
 
-    // Push notification para quem enviou a solicitação (fire-and-forget)
     sendPushToUser(friendRequest.senderId, {
       title: 'Solicitação aceita!',
       body: `${acceptor?.nickname ?? 'Seu amigo'} aceitou sua solicitação de amizade!`,
       data: { type: 'friend_request_accepted', friendshipId: updated.id },
+    }).catch(() => {});
+
+    notificationsService.create(friendRequest.senderId, {
+      type: 'friend_accepted',
+      title: 'Amizade aceita!',
+      body: `${acceptor?.nickname ?? 'Seu amigo'} aceitou sua solicitação!`,
+      data: { acceptorId: userId, friendshipId: updated.id },
     }).catch(() => {});
 
     return updated;

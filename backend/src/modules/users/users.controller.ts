@@ -23,6 +23,19 @@ export class UsersController {
     } catch (err) { next(err); }
   }
 
+  async uploadAvatar(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req as AuthRequest;
+      if (!req.file) {
+        res.status(400).json({ error: 'Nenhuma imagem enviada', code: 'NO_FILE' });
+        return;
+      }
+      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      const user = await usersService.update(userId, { avatarUrl });
+      res.json(user);
+    } catch (err) { next(err); }
+  }
+
   async search(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const q = req.query.q as string;

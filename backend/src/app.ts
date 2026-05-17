@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -109,6 +110,9 @@ if (!isProd) {
     });
   });
 }
+
+// ─── Static files (uploads) ───────────────────────────────────────────────────
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // ─── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
