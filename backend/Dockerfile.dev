@@ -8,7 +8,10 @@ RUN npm ci
 COPY prisma ./prisma
 RUN npx prisma generate
 
+# Copy node_modules to a backup so the volume mount doesn't hide them
+RUN cp -a /app/node_modules /app/_node_modules_cache
+
 # src/ is bind-mounted at runtime — no COPY needed here
 EXPOSE 3333
 
-CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && npx tsx watch src/server.ts"]
+CMD ["sh", "-c", "cp -an /app/_node_modules_cache/. /app/node_modules/ && npx prisma generate && npx prisma migrate deploy && npx tsx watch src/server.ts"]

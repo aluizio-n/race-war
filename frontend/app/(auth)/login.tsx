@@ -148,7 +148,8 @@ export default function LoginScreen() {
 function SocialButton({ emoji, label }: { emoji: string; label: string }) {
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
+      activeOpacity={1}
+      disabled
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -159,10 +160,14 @@ function SocialButton({ emoji, label }: { emoji: string; label: string }) {
         borderWidth: 1,
         borderColor: '#334155',
         gap: 10,
+        opacity: 0.5,
       }}
     >
       <Text style={{ fontSize: 18 }}>{emoji}</Text>
       <Text style={{ color: '#F8FAFC', fontSize: 14, fontFamily: 'Inter_500Medium' }}>{label}</Text>
+      <View style={{ backgroundColor: '#F59E0B', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+        <Text style={{ color: '#0F172A', fontSize: 9, fontFamily: 'Inter_700Bold' }}>EM BREVE</Text>
+      </View>
     </TouchableOpacity>
   );
 }
