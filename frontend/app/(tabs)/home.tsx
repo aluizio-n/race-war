@@ -6,10 +6,10 @@ import { useRouter } from 'expo-router';
 import { Bell, ChevronRight, Flame, Map, Trophy } from 'lucide-react-native';
 import { Card } from '../../src/components/ui/Card';
 import { StatBadge } from '../../src/components/ui/StatBadge';
-import { formatArea, formatDistance } from '../../src/utils/format';
+import { formatArea, formatDistance, formatTimeRemaining } from '../../src/utils/format';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/lib/api';
-import type { ActivityMode } from '../../src/types';
+import type { ActivityMode, UserChallengeResponse } from '../../src/types';
 
 const MODE_COLORS = { race: '#22C55E', bike: '#06B6D4', skate: '#A855F7' };
 const MODE_EMOJI = { race: '🏃', bike: '🚲', skate: '🛹' };
@@ -34,16 +34,24 @@ export default function HomeScreen() {
   const [activities, setActivities] = useState<ApiActivity[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [rank, setRank] = useState<number | null>(null);
+  const [dailyChallenge, setDailyChallenge] = useState<UserChallengeResponse | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
-    const [actRes, statsRes, rankRes] = await Promise.allSettled([
+    const [actRes, statsRes, rankRes, challengeRes, unreadRes] = await Promise.allSettled([
       apiFetch<{ items: ApiActivity[] }>('/api/activities?limit=5'),
       apiFetch<Stats>('/api/territories/my/stats'),
       apiFetch<{ rank: number }>('/api/leaderboard/me'),
+      apiFetch<UserChallengeResponse[]>('/api/challenges?status=ACTIVE'),
+      apiFetch<{ count: number }>('/api/notifications/unread-count'),
     ]);
     if (actRes.status === 'fulfilled') setActivities(actRes.value.items);
     if (statsRes.status === 'fulfilled') setStats(statsRes.value);
     if (rankRes.status === 'fulfilled') setRank(rankRes.value.rank);
+    if (challengeRes.status === 'fulfilled' && challengeRes.value.length > 0) {
+      setDailyChallenge(challengeRes.value[0]);
+    }
+    if (unreadRes.status === 'fulfilled') setUnreadCount(unreadRes.value.count);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -63,6 +71,7 @@ export default function HomeScreen() {
             <Text style={{ color: '#F8FAFC', fontSize: 22, fontFamily: 'Montserrat_700Bold' }}>Missão do Dia</Text>
           </View>
           <TouchableOpacity
+            onPress={() => router.push('/notifications')}
             style={{
               width: 40,
               height: 40,
@@ -75,6 +84,18 @@ export default function HomeScreen() {
             }}
           >
             <Bell size={18} color="#94A3B8" />
+            {unreadCount > 0 && (
+              <View style={{
+                position: 'absolute', top: -4, right: -4,
+                minWidth: 18, height: 18, borderRadius: 9,
+                backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center',
+                paddingHorizontal: 4, borderWidth: 2, borderColor: '#0F172A',
+              }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -131,43 +152,51 @@ export default function HomeScreen() {
         {/* Daily Challenge */}
         <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
           <SectionHeader title="Desafio do Dia" action="Ver todos" onAction={() => router.push('/challenges')} />
-          <Card glow="#F59E0B">
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 14,
-                  backgroundColor: 'rgba(245,158,11,0.15)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ fontSize: 24 }}>🎯</Text>
+          {dailyChallenge ? (
+            <Card glow="#F59E0B">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 14,
+                    backgroundColor: 'rgba(245,158,11,0.15)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 24 }}>{dailyChallenge.challenge.rewardEmoji}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#F8FAFC', fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 2 }}>
+                    {dailyChallenge.challenge.title}
+                  </Text>
+                  <Text style={{ color: '#475569', fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+                    Expira em {formatTimeRemaining(dailyChallenge.challenge.expiresAt)}
+                  </Text>
+                </View>
+                <View>
+                  <Text style={{ color: '#F59E0B', fontSize: 22, fontFamily: 'Montserrat_700Bold' }}>
+                    {dailyChallenge.currentValue % 1 !== 0 ? dailyChallenge.currentValue.toFixed(1) : dailyChallenge.currentValue}/{dailyChallenge.challenge.targetValue}
+                  </Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#F8FAFC', fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 2 }}>
-                  Domine 3 Quarteirões
-                </Text>
-                <Text style={{ color: '#475569', fontSize: 12, fontFamily: 'Inter_400Regular' }}>
-                  Expira em 14h 32min
-                </Text>
+              <View style={{ marginTop: 14, height: 6, backgroundColor: '#334155', borderRadius: 3 }}>
+                <View style={{ width: `${Math.min(dailyChallenge.currentValue / dailyChallenge.challenge.targetValue, 1) * 100}%` as `${number}%`, height: '100%', backgroundColor: '#F59E0B', borderRadius: 3 }} />
               </View>
-              <View>
-                <Text style={{ color: '#F59E0B', fontSize: 22, fontFamily: 'Montserrat_700Bold' }}>1/3</Text>
-              </View>
-            </View>
-
-            {/* Progress bar */}
-            <View style={{ marginTop: 14, height: 6, backgroundColor: '#334155', borderRadius: 3 }}>
-              <View style={{ width: '33%', height: '100%', backgroundColor: '#F59E0B', borderRadius: 3 }} />
-            </View>
-          </Card>
+            </Card>
+          ) : (
+            <Card>
+              <Text style={{ color: '#475569', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+                Nenhum desafio ativo
+              </Text>
+            </Card>
+          )}
         </View>
 
         {/* Recent activities */}
         <View style={{ paddingHorizontal: 20 }}>
-          <SectionHeader title="Batalhas Recentes" action="Ver histórico" onAction={() => {}} />
+          <SectionHeader title="Batalhas Recentes" action="Ver histórico" onAction={() => router.push({ pathname: '/(tabs)/profile', params: { tab: 'history' } })} />
           {activities.length === 0 ? (
             <Text style={{ color: '#475569', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 12 }}>
               Nenhuma atividade ainda. Inicie uma guerra!

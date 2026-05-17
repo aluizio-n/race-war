@@ -7,6 +7,7 @@ interface AuthUser {
   name: string;
   nickname: string;
   email: string;
+  avatarUrl: string | null;
 }
 
 interface AuthState {

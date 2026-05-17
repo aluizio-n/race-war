@@ -66,6 +66,10 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="activity" />
               <Stack.Screen name="challenges" options={{ animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="friends" options={{ animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="user/[id]" options={{ animation: 'slide_from_right' }} />
+              <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+              <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
             </Stack>
           </AuthGuard>
         </AuthProvider>

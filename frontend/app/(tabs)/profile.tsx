@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, Platform, Share, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, UserPlus, Share2, Map, Flame, Trophy, Star } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Settings, UserPlus, Share2, Map, Flame, Trophy, Star, Camera } from 'lucide-react-native';
 import { StatBadge } from '../../src/components/ui/StatBadge';
 import { formatArea, formatDistance } from '../../src/utils/format';
-import type { ActivityMode } from '../../src/types';
+import type { ActivityMode, UserChallengeResponse } from '../../src/types';
 import { MODE_COLORS } from '../../src/utils/colors';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/lib/api';
-import { useRouter } from 'expo-router';
+import { storage } from '../../src/lib/storage';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3333';
 
 const { width } = Dimensions.get('window');
 
@@ -29,30 +33,99 @@ interface TerritoryStats {
   byMode: Array<{ mode: string; areaM2: number; count: number }>;
 }
 
+interface BadgeItem {
+  id: string;
+  emoji: string;
+  name: string;
+  color: string;
+  unlocked: boolean;
+}
+
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<'stats' | 'badges' | 'history'>('stats');
   const [activities, setActivities] = useState<ApiActivity[]>([]);
   const [stats, setStats] = useState<TerritoryStats | null>(null);
   const [rank, setRank] = useState<number | null>(null);
+  const [badges, setBadges] = useState<BadgeItem[]>([]);
+
+  useEffect(() => {
+    if (tab === 'history') setActiveTab('history');
+  }, [tab]);
 
   const load = useCallback(async () => {
-    const [actRes, statsRes, rankRes] = await Promise.allSettled([
+    const [actRes, statsRes, rankRes, badgeRes] = await Promise.allSettled([
       apiFetch<{ items: ApiActivity[] }>('/api/activities?limit=10'),
       apiFetch<TerritoryStats>('/api/territories/my/stats'),
       apiFetch<{ rank: number }>('/api/leaderboard/me'),
+      apiFetch<UserChallengeResponse[]>('/api/challenges'),
     ]);
     if (actRes.status === 'fulfilled') setActivities(actRes.value.items);
     if (statsRes.status === 'fulfilled') setStats(statsRes.value);
     if (rankRes.status === 'fulfilled') setRank(rankRes.value.rank);
+    if (badgeRes.status === 'fulfilled') {
+      setBadges(badgeRes.value.map(uc => ({
+        id: uc.id,
+        emoji: uc.challenge.rewardEmoji,
+        name: uc.challenge.rewardName,
+        color: uc.challenge.rewardColor,
+        unlocked: uc.status === 'COMPLETED',
+      })));
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/(auth)/login');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.avatarUrl) setAvatarUrl(user.avatarUrl);
+  }, [user]);
+
+  const handlePickAvatar = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissao necessaria', 'Precisamos de acesso a galeria para trocar a foto.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    const formData = new FormData();
+    const filename = asset.uri.split('/').pop() ?? 'avatar.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+    formData.append('avatar', { uri: asset.uri, name: filename, type } as any);
+
+    try {
+      const token = await storage.getAccessToken();
+      const res = await fetch(`${API_BASE}/api/users/me/avatar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Upload falhou');
+      const data = await res.json();
+      setAvatarUrl(data.avatarUrl);
+    } catch {
+      Alert.alert('Erro', 'Nao foi possivel enviar a foto.');
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Confira meu perfil no Race War!\n@${user?.nickname}\n${stats?.totalCount ?? 0} territorios dominados | ${formatArea(stats?.totalAreaM2 ?? 0)}\n\nBaixe e domine sua cidade! #RaceWar`,
+      });
+    } catch {}
   };
 
   return (
@@ -64,7 +137,7 @@ export default function ProfileScreen() {
         {/* Header */}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
           <TouchableOpacity
-            onPress={handleLogout}
+            onPress={() => router.push('/settings')}
             style={{
               width: 38,
               height: 38,
@@ -88,20 +161,31 @@ export default function ProfileScreen() {
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 }}>
               {/* Avatar */}
-              <LinearGradient
-                colors={['#22C55E', '#06B6D4']}
-                style={{
-                  width: 68,
-                  height: 68,
-                  borderRadius: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ fontSize: 28, fontFamily: 'Montserrat_700Bold', color: '#0F172A' }}>
-                  {user?.name?.charAt(0).toUpperCase() ?? '?'}
-                </Text>
-              </LinearGradient>
+              <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.8}>
+                {avatarUrl ? (
+                  <Image
+                    source={{ uri: avatarUrl.startsWith('/') ? `${API_BASE}${avatarUrl}` : avatarUrl }}
+                    style={{ width: 68, height: 68, borderRadius: 20 }}
+                  />
+                ) : (
+                  <LinearGradient
+                    colors={['#22C55E', '#06B6D4']}
+                    style={{ width: 68, height: 68, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Text style={{ fontSize: 28, fontFamily: 'Montserrat_700Bold', color: '#0F172A' }}>
+                      {user?.name?.charAt(0).toUpperCase() ?? '?'}
+                    </Text>
+                  </LinearGradient>
+                )}
+                <View style={{
+                  position: 'absolute', bottom: -2, right: -2,
+                  width: 24, height: 24, borderRadius: 12,
+                  backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 2, borderColor: '#1E293B',
+                }}>
+                  <Camera size={12} color="#0F172A" />
+                </View>
+              </TouchableOpacity>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: '#F8FAFC', fontSize: 19, fontFamily: 'Montserrat_700Bold' }}>{user?.name ?? '—'}</Text>
                 <Text style={{ color: '#475569', fontSize: 13, marginTop: 2 }}>@{user?.nickname ?? '—'}</Text>
@@ -117,6 +201,7 @@ export default function ProfileScreen() {
             {/* Action buttons */}
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <TouchableOpacity
+                onPress={() => router.push('/friends')}
                 style={{
                   flex: 1,
                   flexDirection: 'row',
@@ -134,6 +219,7 @@ export default function ProfileScreen() {
                 <Text style={{ color: '#22C55E', fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>Amigos</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                onPress={handleShare}
                 style={{
                   flex: 1,
                   flexDirection: 'row',
@@ -189,7 +275,7 @@ export default function ProfileScreen() {
         {/* Tab content */}
         <View style={{ paddingHorizontal: 20 }}>
           {activeTab === 'stats' && <StatsTab stats={stats} activities={activities} />}
-          {activeTab === 'badges' && <BadgesTab />}
+          {activeTab === 'badges' && <BadgesTab badges={badges} />}
           {activeTab === 'history' && <HistoryTab activities={activities} />}
         </View>
       </ScrollView>
@@ -239,19 +325,21 @@ function StatsTab({ stats, activities }: { stats: TerritoryStats | null; activit
   );
 }
 
-const STATIC_BADGES = [
-  { id: '1', emoji: '🏆', name: 'Primeiro Território', color: '#F59E0B', unlocked: true },
-  { id: '2', emoji: '🔥', name: 'Em Chamas', color: '#EF4444', unlocked: false },
-  { id: '3', emoji: '⚡', name: 'Velocista', color: '#F59E0B', unlocked: false },
-  { id: '4', emoji: '🎯', name: '10 Quarteirões', color: '#22C55E', unlocked: false },
-  { id: '5', emoji: '🌊', name: 'Ciclista', color: '#06B6D4', unlocked: false },
-  { id: '6', emoji: '👑', name: 'General Supremo', color: '#A855F7', unlocked: false },
-];
+function BadgesTab({ badges }: { badges: BadgeItem[] }) {
+  if (badges.length === 0) {
+    return (
+      <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+        <Text style={{ fontSize: 36, marginBottom: 10 }}>🎖️</Text>
+        <Text style={{ color: '#475569', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+          Nenhuma medalha ainda. Complete desafios para ganhar!
+        </Text>
+      </View>
+    );
+  }
 
-function BadgesTab() {
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-      {STATIC_BADGES.map(b => (
+      {badges.map(b => (
         <View
           key={b.id}
           style={{

@@ -23,6 +23,28 @@ export function formatPace(minPerKm: number): string {
   return `${m}:${String(s).padStart(2, '0')} /km`;
 }
 
+export function formatTimeRemaining(isoDate: string): string {
+  const diff = new Date(isoDate).getTime() - Date.now();
+  if (diff <= 0) return 'Expirado';
+  const hours = Math.floor(diff / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  if (hours >= 48) return `${Math.ceil(hours / 24)} dias`;
+  if (hours > 0) return `${hours}h ${minutes}min`;
+  return `${minutes}min`;
+}
+
+export function formatRelativeTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  if (diff < 60000) return 'agora';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `há ${mins}min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'há 1 dia';
+  return `há ${days} dias`;
+}
+
 export function polygonArea(coords: { latitude: number; longitude: number }[]): number {
   if (coords.length < 3) return 0;
   const R = 6371000;

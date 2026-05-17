@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Zap, Heart, ChevronRight } from 'lucide-react-native';
+import * as Location from 'expo-location';
+import * as Battery from 'expo-battery';
 import { ModeToggle } from '../../src/components/ui/ModeToggle';
 import { Card } from '../../src/components/ui/Card';
 import type { ActivityMode } from '../../src/types';
@@ -19,6 +21,26 @@ export default function StartScreen() {
   const router = useRouter();
   const [mode, setMode] = useState<ActivityMode>('race');
   const color = MODE_COLORS[mode];
+  const [gpsStatus, setGpsStatus] = useState<'ok' | 'error'>('error');
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'granted') {
+        setGpsStatus('ok');
+      } else {
+        const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+        setGpsStatus(newStatus === 'granted' ? 'ok' : 'error');
+      }
+
+      const level = await Battery.getBatteryLevelAsync();
+      if (level >= 0) setBatteryLevel(Math.round(level * 100));
+    })();
+  }, []);
+
+  const batteryStatus: 'ok' | 'error' = batteryLevel !== null && batteryLevel >= 20 ? 'ok' : 'error';
+  const batteryLabel = batteryLevel !== null ? `Bateria: ${batteryLevel}%` : 'Bateria: verificando...';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }} edges={['top']}>
@@ -62,9 +84,9 @@ export default function StartScreen() {
           Verificação Pré-batalha
         </Text>
         <Card style={{ gap: 0 }}>
-          <CheckItem icon={<MapPin size={18} color="#22C55E" />} label="GPS ativo" status="ok" />
+          <CheckItem icon={<MapPin size={18} color={gpsStatus === 'ok' ? '#22C55E' : '#EF4444'} />} label="GPS ativo" status={gpsStatus} />
           <View style={{ height: 1, backgroundColor: '#334155', marginVertical: 12 }} />
-          <CheckItem icon={<Zap size={18} color="#F59E0B" />} label="Bateria: 84%" status="ok" />
+          <CheckItem icon={<Zap size={18} color={batteryStatus === 'ok' ? '#F59E0B' : '#EF4444'} />} label={batteryLabel} status={batteryStatus} />
           <View style={{ height: 1, backgroundColor: '#334155', marginVertical: 12 }} />
           <CheckItem icon={<Heart size={18} color="#EF4444" />} label="Monitor Cardíaco" status="optional" />
         </Card>
@@ -72,8 +94,9 @@ export default function StartScreen() {
         {/* Start button */}
         <TouchableOpacity
           activeOpacity={0.9}
+          disabled={gpsStatus !== 'ok'}
           onPress={() => router.push({ pathname: '/activity/tracking', params: { mode } })}
-          style={{ marginTop: 32 }}
+          style={{ marginTop: 32, opacity: gpsStatus === 'ok' ? 1 : 0.5 }}
         >
           <LinearGradient
             colors={[color, `${color}99`]}

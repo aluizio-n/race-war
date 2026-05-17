@@ -69,3 +69,23 @@ export interface Challenge {
   expiresAt: string;
   mode?: ActivityMode;
 }
+
+export interface UserChallengeResponse {
+  id: string;
+  currentValue: number;
+  status: 'ACTIVE' | 'COMPLETED' | 'EXPIRED';
+  completedAt: string | null;
+  challenge: {
+    id: string;
+    title: string;
+    description: string;
+    mode: 'RACE' | 'BIKE' | 'SKATE' | null;
+    targetValue: number;
+    unit: string;
+    rewardEmoji: string;
+    rewardName: string;
+    rewardColor: string;
+    startsAt: string;
+    expiresAt: string;
+  };
+}
