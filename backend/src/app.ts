@@ -48,20 +48,9 @@ app.use(
 );
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
-// Set CORS_ORIGIN to a comma-separated list of allowed origins (e.g. https://app.racewar.com)
-const allowedOrigins = (process.env.CORS_ORIGIN ?? '')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
-
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, server-to-server)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: origin '${origin}' não permitida`));
-    },
+    origin: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

@@ -75,7 +75,7 @@ export async function apiFetch<T = unknown>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, body.message ?? 'Erro inesperado');
+    throw new ApiError(res.status, body.error ?? body.message ?? 'Erro inesperado');
   }
 
   // 204 No Content
