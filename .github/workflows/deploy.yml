@@ -24,4 +24,4 @@ jobs:
             docker image prune -f
             echo "Waiting for API health check..."
             sleep 10
-            curl -sf http://localhost/health || echo "WARNING: health check failed"
+            curl -sf http://localhost:3080/health || echo "WARNING: health check failed"
