@@ -1,0 +1,40 @@
+{
+  "cli": {
+    "version": ">= 15.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "ios": {
+        "buildConfiguration": "Debug"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://82.25.85.237",
+        "EXPO_PUBLIC_WS_URL": "http://82.25.85.237"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://82.25.85.237",
+        "EXPO_PUBLIC_WS_URL": "http://82.25.85.237"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

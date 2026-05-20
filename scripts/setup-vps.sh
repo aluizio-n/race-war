@@ -18,12 +18,13 @@ if ! docker compose version &> /dev/null; then
 fi
 
 # Clone repo
-if [ ! -d /opt/race-war ]; then
+mkdir -p /opt/apps
+if [ ! -d /opt/apps/race-war ]; then
   echo "Cloning repository..."
-  git clone https://github.com/aluizio-n/race-war.git /opt/race-war
+  git clone https://github.com/aluizio-n/race-war.git /opt/apps/race-war
 fi
 
-cd /opt/race-war
+cd /opt/apps/race-war
 
 # Create uploads directory
 mkdir -p backend/uploads/avatars
@@ -56,7 +57,7 @@ EOF
   echo "Postgres password: ${PG_PASSWORD}"
   echo "JWT secret: ${JWT_SECRET}"
   echo ""
-  echo "Edit /opt/race-war/.env to set CORS_ORIGIN and VAPID keys."
+  echo "Edit /opt/apps/race-war/.env to set CORS_ORIGIN and VAPID keys."
 fi
 
 # Create nginx certs directory
