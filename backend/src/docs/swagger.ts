@@ -366,6 +366,42 @@ const swaggerOptions: Options = {
           },
         },
       },
+      '/users/me/avatar': {
+        post: {
+          tags: ['Users'],
+          summary: 'Upload de avatar do usuário',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  required: ['avatar'],
+                  properties: {
+                    avatar: { type: 'string', format: 'binary', description: 'Imagem JPEG, PNG ou WebP (max 5MB)' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Avatar atualizado',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: { avatarUrl: { type: 'string', example: '/uploads/avatars/abc123.jpg' } },
+                  },
+                },
+              },
+            },
+            400: { description: 'Arquivo inválido', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+            401: { description: 'Não autenticado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          },
+        },
+      },
       '/users/search': {
         get: {
           tags: ['Users'],
@@ -858,6 +894,95 @@ const swaggerOptions: Options = {
           responses: {
             204: { description: 'Subscription removida' },
             401: { description: 'Não autenticado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          },
+        },
+      },
+      // ─── Notifications (CRUD) ──────────────────────────────────────────────
+      '/notifications': {
+        get: {
+          tags: ['Notifications'],
+          summary: 'Listar notificações do usuário',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+          ],
+          responses: {
+            200: {
+              description: 'Lista de notificações',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string', format: 'uuid' },
+                        type: { type: 'string', example: 'friend_request' },
+                        title: { type: 'string', example: 'Nova solicitação de amizade' },
+                        body: { type: 'string', example: 'João quer ser seu amigo' },
+                        data: { type: 'object', nullable: true },
+                        read: { type: 'boolean' },
+                        createdAt: { type: 'string', format: 'date-time' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { description: 'Não autenticado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          },
+        },
+      },
+      '/notifications/unread-count': {
+        get: {
+          tags: ['Notifications'],
+          summary: 'Quantidade de notificações não lidas',
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: {
+              description: 'Contagem de não lidas',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: { count: { type: 'integer', example: 3 } },
+                  },
+                },
+              },
+            },
+            401: { description: 'Não autenticado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          },
+        },
+      },
+      '/notifications/read-all': {
+        patch: {
+          tags: ['Notifications'],
+          summary: 'Marcar todas as notificações como lidas',
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { description: 'Todas marcadas como lidas' },
+            401: { description: 'Não autenticado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          },
+        },
+      },
+      '/notifications/{id}/read': {
+        patch: {
+          tags: ['Notifications'],
+          summary: 'Marcar notificação como lida',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+              description: 'ID da notificação',
+            },
+          ],
+          responses: {
+            200: { description: 'Notificação marcada como lida' },
+            401: { description: 'Não autenticado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+            404: { description: 'Notificação não encontrada', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
           },
         },
       },

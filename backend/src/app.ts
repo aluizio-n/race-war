@@ -25,9 +25,9 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:'],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https://validator.swagger.io'],
         connectSrc: ["'self'"],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
@@ -37,9 +37,9 @@ app.use(
       },
     },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-    crossOriginEmbedderPolicy: true,
+    crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: { policy: 'same-origin' },
-    crossOriginResourcePolicy: { policy: 'same-origin' },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
     hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
   }),
 );
@@ -94,22 +94,22 @@ app.use(
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
-// ─── Swagger UI (development only) ────────────────────────────────────────────
-if (!isProd) {
-  // Loaded dynamically to keep prod bundle lean and avoid unsafe-inline CSP in prod
-  Promise.all([
-    import('swagger-ui-express'),
-    import('swagger-jsdoc'),
-    import('./docs/swagger'),
-  ]).then(([swaggerUi, { default: swaggerJsdoc }, { default: swaggerOptions }]) => {
-    const spec = swaggerJsdoc(swaggerOptions);
-    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec));
-    app.get('/api-docs.json', (_req, res) => {
-      res.setHeader('Content-Type', 'application/json');
-      res.send(spec);
-    });
+// ─── Swagger UI ──────────────────────────────────────────────────────────────
+Promise.all([
+  import('swagger-ui-express'),
+  import('swagger-jsdoc'),
+  import('./docs/swagger'),
+]).then(([swaggerUi, { default: swaggerJsdoc }, { default: swaggerOptions }]) => {
+  const spec = swaggerJsdoc(swaggerOptions);
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'Race War API Docs',
+  }));
+  app.get('/api-docs.json', (_req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(spec);
   });
-}
+});
 
 // ─── Static files (uploads) ───────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
