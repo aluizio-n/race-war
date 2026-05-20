@@ -5,6 +5,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
+import swaggerOptions from './docs/swagger';
 
 import authRoutes from './modules/auth/auth.routes';
 import usersRoutes from './modules/users/users.routes';
@@ -95,20 +98,14 @@ app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // ─── Swagger UI ──────────────────────────────────────────────────────────────
-Promise.all([
-  import('swagger-ui-express'),
-  import('swagger-jsdoc'),
-  import('./docs/swagger'),
-]).then(([swaggerUi, { default: swaggerJsdoc }, { default: swaggerOptions }]) => {
-  const spec = swaggerJsdoc(swaggerOptions);
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Race War API Docs',
-  }));
-  app.get('/api-docs.json', (_req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.send(spec);
-  });
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Race War API Docs',
+}));
+app.get('/api-docs.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
 });
 
 // ─── Static files (uploads) ───────────────────────────────────────────────────
