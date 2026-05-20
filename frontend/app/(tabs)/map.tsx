@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import MapView, { Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Layers } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import type { ActivityMode } from '../../src/types';
@@ -37,6 +37,7 @@ const MAP_STYLE = [
 ];
 
 export default function MapScreen() {
+  const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState<ActivityMode | 'all'>('all');
   const [territories, setTerritories] = useState<ApiTerritory[]>([]);
   const [selectedTerritory, setSelectedTerritory] = useState<ApiTerritory | null>(null);
@@ -137,7 +138,7 @@ export default function MapScreen() {
         const color = MODE_COLORS[mode];
         const emoji = mode === 'race' ? '🏃' : mode === 'bike' ? '🚲' : '🛹';
         return (
-          <View style={{ position: 'absolute', bottom: Platform.OS === 'ios' ? 100 : 80, left: 16, right: 16 }}>
+          <View style={{ position: 'absolute', bottom: 72 + insets.bottom, left: 16, right: 16 }}>
             <BlurWrapper padding={16}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: `${color}20`, borderWidth: 1, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>

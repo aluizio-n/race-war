@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Dimensions, Platform, Alert } from 'react
 import MapView, { Polyline, Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -60,6 +61,7 @@ function polygonAreaM2(coords: Coordinate[]): number {
 
 export default function TrackingScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { mode = 'race' } = useLocalSearchParams<{ mode: ActivityMode }>();
   const activeMode = (mode as ActivityMode) ?? 'race';
   const color = MODE_COLORS[activeMode];
@@ -271,7 +273,7 @@ export default function TrackingScreen() {
 
       {/* Top stats overlay */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
-        <View style={{ paddingTop: Platform.OS === 'ios' ? 54 : 32, paddingHorizontal: 16 }}>
+        <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16 }}>
           <OverlayCard>
             <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
               <StatItem label="Tempo" value={formatDuration(elapsed)} color={color} />
@@ -290,7 +292,7 @@ export default function TrackingScreen() {
           style={[
             {
               position: 'absolute',
-              top: Platform.OS === 'ios' ? 140 : 120,
+              top: insets.top + 90,
               left: 16,
               right: 16,
             },
@@ -323,7 +325,7 @@ export default function TrackingScreen() {
       )}
 
       {/* Bottom controls */}
-      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Platform.OS === 'ios' ? 40 : 24, paddingHorizontal: 24 }}>
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: insets.bottom + 16, paddingHorizontal: 24 }}>
         <OverlayCard>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             {/* Mode chip */}

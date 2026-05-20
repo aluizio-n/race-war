@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, CheckCheck, UserPlus, UserCheck, Trophy, Bell } from 'lucide-react-native';
 import { apiFetch } from '../src/lib/api';
@@ -27,6 +27,7 @@ const DEFAULT_CONFIG = { icon: <Bell size={18} color="#94A3B8" />, color: '#94A3
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -106,7 +107,7 @@ export default function NotificationsScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 16 + insets.bottom }}
       >
         {loading ? (
           <>

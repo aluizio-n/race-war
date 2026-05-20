@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Platform, ListRenderItemInfo } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, ListRenderItemInfo } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trophy } from 'lucide-react-native';
 import { formatArea } from '../../src/utils/format';
 import type { ActivityMode } from '../../src/types';
@@ -28,6 +28,7 @@ interface MyRank {
 
 export default function LeaderboardScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'global' | ActivityMode>('global');
   const [data, setData] = useState<LeaderboardEntry[]>([]);
   const [myRank, setMyRank] = useState<MyRank | null>(null);
@@ -98,7 +99,7 @@ export default function LeaderboardScreen() {
       <FlatList
         data={rest}
         keyExtractor={item => String(item.rank)}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 100 : 80 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 72 + insets.bottom }}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }: ListRenderItemInfo<LeaderboardEntry>) => (
           <LeaderRow item={item} isMe={item.user.id === user?.id} />

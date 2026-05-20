@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { Platform, View } from 'react-native';
 import { Home, Map, Trophy, User, Swords } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function TabIcon({ color, focused, Icon }: { color: string; focused: boolean; Icon: any }) {
   return (
@@ -22,6 +23,8 @@ function TabIcon({ color, focused, Icon }: { color: string; focused: boolean; Ic
 }
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -34,13 +37,13 @@ export default function TabsLayout() {
           bottom: 0,
           left: 0,
           right: 0,
-          height: Platform.OS === 'ios' ? 88 : 68,
+          height: 60 + insets.bottom,
           backgroundColor: Platform.OS === 'android' ? '#0F172A' : 'transparent',
           borderTopWidth: 1,
           borderTopColor: '#1E293B',
           elevation: 0,
           shadowOpacity: 0,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+          paddingBottom: insets.bottom,
           paddingTop: 8,
         },
         tabBarBackground: () =>
@@ -77,7 +80,7 @@ export default function TabsLayout() {
                 backgroundColor: '#22C55E',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginBottom: Platform.OS === 'ios' ? 12 : 4,
+                marginBottom: 8,
                 shadowColor: '#22C55E',
                 shadowOpacity: 0.5,
                 shadowRadius: 12,

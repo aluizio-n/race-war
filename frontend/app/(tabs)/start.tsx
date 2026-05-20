@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Platform, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Zap, Heart, ChevronRight } from 'lucide-react-native';
@@ -19,6 +19,7 @@ const TIPS: Record<ActivityMode, string> = {
 
 export default function StartScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<ActivityMode>('race');
   const color = MODE_COLORS[mode];
   const [gpsStatus, setGpsStatus] = useState<'ok' | 'error'>('error');
@@ -46,7 +47,7 @@ export default function StartScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 20, paddingBottom: Platform.OS === 'ios' ? 100 : 80 }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 72 + insets.bottom }}
       >
         <Text style={{ fontSize: 24, fontFamily: 'Montserrat_700Bold', color: '#F8FAFC', marginBottom: 4 }}>
           Setup da Guerra

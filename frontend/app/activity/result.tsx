@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions, Platform, Share } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Share2, Home, Repeat } from 'lucide-react-native';
@@ -28,6 +28,7 @@ interface SpeedViolation {
 
 export default function ResultScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     mode: string;
     elapsed: string;
@@ -97,7 +98,7 @@ export default function ResultScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: 16 + insets.bottom }}
       >
         {/* Speed violation warning */}
         {speedViolation && (

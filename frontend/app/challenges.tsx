@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Platform, ListRenderItemInfo } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, ListRenderItemInfo } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Clock, ChevronLeft } from 'lucide-react-native';
@@ -12,6 +12,7 @@ import { SkeletonCard } from '../src/components/ui/SkeletonLoader';
 
 export default function ChallengesScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [challenges, setChallenges] = useState<UserChallengeResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -171,7 +172,7 @@ export default function ChallengesScreen() {
         <FlatList
           data={challenges}
           keyExtractor={item => item.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 16 + insets.bottom }}
           showsVerticalScrollIndicator={false}
           renderItem={renderItem}
         />

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, ChevronRight, Search, Check, UserPlus } from 'lucide-react-native';
 import { Input } from '../src/components/ui/Input';
@@ -30,6 +30,7 @@ interface PendingRequest {
 export default function FriendsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [friends, setFriends] = useState<FriendUser[]>([]);
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,7 +131,7 @@ export default function FriendsScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 16 + insets.bottom }}
       >
         {isSearchActive ? (
           <>
