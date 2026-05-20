@@ -22,6 +22,8 @@ import { errorMiddleware } from './shared/middleware/error.middleware';
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
 
+app.set('trust proxy', 1);
+
 // ─── Security headers ─────────────────────────────────────────────────────────
 app.use(
   helmet({
