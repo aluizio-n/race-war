@@ -42,6 +42,14 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Race War needs location to track your activity."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ],
     "scheme": "racewar",
