@@ -8,7 +8,12 @@ export const updateProfileSchema = z.object({
     .max(30)
     .regex(/^[a-zA-Z0-9_]+$/)
     .optional(),
-  avatarUrl: z.string().url().optional().nullable(),
+  avatarUrl: z
+    .string()
+    .url()
+    .refine(url => /^https?:\/\//.test(url),'URL inválida')
+    .optional()
+    .nullable(),
 });
 
 export const userParamSchema = z.object({

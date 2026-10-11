@@ -68,7 +68,7 @@ npm run web        # Run in browser
 
 **Stack:** Node.js · Express 4 · TypeScript  
 **Database:** PostgreSQL 16 · Prisma ORM  
-**Auth:** JWT (7-day access tokens) + refresh token rotation  
+**Auth:** JWT (15-minute access tokens) + refresh token rotation  
 **Validation:** Zod  
 **Security:** Helmet · CORS · bcryptjs (12 rounds) · express-rate-limit  
 **Logging:** Morgan  

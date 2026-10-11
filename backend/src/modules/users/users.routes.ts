@@ -7,11 +7,18 @@ import { authMiddleware } from '../../shared/middleware/auth.middleware';
 import { validate } from '../../shared/middleware/validate.middleware';
 import { updateProfileSchema, searchSchema } from './users.schema';
 
+// Extension comes from the validated mimetype, never from the client filename,
+// so nothing other than an image can be served back from /uploads.
+const AVATAR_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+};
+
 const avatarStorage = multer.diskStorage({
   destination: path.join(__dirname, '..', '..', '..', 'uploads', 'avatars'),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, `${uuid()}${ext}`);
+    cb(null, `${uuid()}${AVATAR_EXTENSIONS[file.mimetype]}`);
   },
 });
 
@@ -19,8 +26,7 @@ const avatarUpload = multer({
   storage: avatarStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-    cb(null, allowed.includes(file.mimetype));
+    cb(null, file.mimetype in AVATAR_EXTENSIONS);
   },
 });
 
